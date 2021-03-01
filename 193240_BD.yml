@@ -1,0 +1,425 @@
+
+  # Volumen persistente postgres
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: basesdb-namespace
+  name: postgres-vol
+  labels:
+    type: local
+    app: postgresapp
+spec: 
+  storageClassName: storage-postgres
+  capacity:
+    storage: 10Gi 
+  accessModes:
+    - ReadWriteOnce 
+  hostPath:
+    path: "/mnt/postgres-vol" 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: basesdb-namespace
+  name: postgrespvc-vol
+  labels:
+    app: postgresapp
+spec:
+  storageClassName: storage-postgres
+  accessModes:
+    - ReadWriteOnce
+  resources: 
+    requests:
+      storage: 5Gi 
+---
+  # Volumen persistente mysql
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: basesdb-namespace
+  name: mysql-vol
+  labels:
+    type: local
+    app: mysqlapp
+spec: 
+  storageClassName: storage-mysql
+  capacity:
+    storage: 10Gi 
+  accessModes:
+    - ReadWriteOnce 
+  hostPath:
+    path: "/mnt/mysql-vol" 
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: basesdb-namespace
+  name: mysqlpvc-vol
+  labels:
+    app: mysqlapp
+spec:
+  storageClassName: storage-mysql
+  accessModes:
+    - ReadWriteOnce
+  resources: 
+    requests:
+      storage: 5Gi 
+---
+# Volumen persistente mongo
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: basesdb-namespace
+  name: mongo-vol
+  labels:
+    type: local
+    app: mongoapp
+spec: 
+  storageClassName: storage-mongo
+  capacity:
+    storage: 10Gi 
+  accessModes:
+    - ReadWriteOnce 
+  hostPath:
+    path: "/mnt/mongo-vol" 
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: basesdb-namespace
+  name: mongopvc-vol
+  labels:
+    app: mongoapp
+spec:
+  storageClassName: storage-mongo
+  accessModes:
+    - ReadWriteOnce
+  resources: 
+    requests:
+      storage: 5Gi 
+---
+# Volumen persistente redis
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: basesdb-namespace
+  name: redis-vol
+  labels:
+    type: local
+    app: redisapp
+spec: 
+  storageClassName: storage-redis
+  capacity:
+    storage: 10Gi 
+  accessModes:
+    - ReadWriteOnce 
+  hostPath:
+    path: "/mnt/redis-vol" 
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: basesdb-namespace
+  name: redispvc-vol
+  labels:
+    app: redisapp
+spec:
+  storageClassName: storage-redis
+  accessModes:
+    - ReadWriteOnce
+  resources: 
+    requests:
+      storage: 5Gi 
+---
+#postgres storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  namespace: basesdb-namespace
+  name: storage-postgres
+provisioner: kubernetes.io/no-provisioner # no-provisioner -> Entorno de de infraestructura local
+reclaimPolicy: Retain # Que realizara con mis datos 
+volumeBindingMode: WaitForFirstConsumer 
+---
+#mysql storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  namespace: basesdb-namespace
+  name: storage-mysql
+provisioner: kubernetes.io/no-provisioner 
+reclaimPolicy: Retain  
+volumeBindingMode: WaitForFirstConsumer 
+---
+#mongo storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  namespace: basesdb-namespace
+  name: storage-mongo
+provisioner: kubernetes.io/no-provisioner 
+reclaimPolicy: Retain # Que realizara con mis datos 
+volumeBindingMode: WaitForFirstConsumer 
+---
+#REDIS storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  namespace: basesdb-namespace
+  name: storage-redis
+provisioner: kubernetes.io/no-provisioner # no-provisioner -> Entorno de de infraestructura local
+reclaimPolicy: Retain # Que realizara con mis datos 
+volumeBindingMode: WaitForFirstConsumer 
+---
+#configmap postgres
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  labels:
+    app: postgresapp
+data:
+  POSTGRES_DB: postgresdb
+  POSTGRES_USER: user
+  POSTGRES_PASSWORD: password
+---
+#configmap mysql
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  labels:
+    app: mysqlapp
+data:
+  MYSQL_DB: sqldb
+  MYSQL_ROOT_PASSWORD: password
+---
+#configmap mongo
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-config
+  labels:
+    app: mongoapp
+data:
+  MONGO_DB: mongodb
+  MONGO_USER: user
+  MONGO_PASSWORD: password
+---
+#configmap redis
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  labels:
+    app: redisapp
+data:
+  REDIS_DB: mongodb
+  REDIS_USER: user
+  REDIS_PASSWORD: password
+---
+#deply postgres
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: basesdb-namespace
+  labels:
+    app: postgres-server
+spec:
+  selector:
+    matchLabels:
+      app: postgres-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres-server
+    spec:
+      containers:
+        - name: postgres-db
+          image: postgres:11
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: postgres-config
+          volumeMounts:
+            - mountPath: /var/lib/postgressql/data
+              name: postgresdb-volume
+      volumes:
+        - name: postgresdb-volume
+          persistentVolumeClaim:
+            claimName: postgrespvc-vol
+
+--- 
+#deply mysql
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+  namespace: basesdb-namespace
+  labels:
+    app: mysql-server
+spec:
+  selector:
+    matchLabels:
+      app: mysql-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mysql-server
+    spec:
+      containers:
+        - name: mysql-db
+          image: mysql
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: mysql-config
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mysqldb-volume
+      volumes:
+        - name: mysqldb-volume
+          persistentVolumeClaim:
+            claimName: mysqlpvc-vol
+
+--- 
+#deply mongo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment
+  namespace: basesdb-namespace
+  labels:
+    app: mongo-server
+spec:
+  selector:
+    matchLabels:
+      app: mongo-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mongo-server
+    spec:
+      containers:
+        - name: mongo-db
+          image: mongo
+          ports:
+            - containerPort: 27017
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: mongo-config
+          volumeMounts:
+            - mountPath: /var/lib/mongo/data
+              name: mongodb-volume
+      volumes:
+        - name: mongodb-volume
+          persistentVolumeClaim:
+            claimName: mongopvc-vol
+
+--- 
+#deply redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  namespace: basesdb-namespace
+  labels:
+    app: redis-server
+spec:
+  selector:
+    matchLabels:
+      app: redis-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis-server
+    spec:
+      containers:
+        - name: redis-db
+          image: redis:5.0.4
+          ports:
+            - containerPort: 6379
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: redis-config
+          volumeMounts:
+            - mountPath: /var/lib/redis/data
+              name: redisdb-volume
+      volumes:
+        - name: redisdb-volume
+          persistentVolumeClaim:
+            claimName: redispvc-vol
+
+--- 
+#exposicion postgres
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: basesdb-namespace
+spec:
+  selector:
+    app: postgres-server
+  ports:
+    - port: 5300
+      targetPort: 5432
+  type: LoadBalancer
+
+---
+#exposicion mysql
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: basesdb-namespace
+spec:
+  selector:
+    app: mysql-server
+  ports:
+    - port: 5303
+      targetPort: 3306
+  type: LoadBalancer
+
+---
+
+#exposicion mongo
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+  namespace: basesdb-namespace
+spec:
+  selector:
+    app: mongo-server
+  ports:
+    - port: 5302
+      targetPort: 27017
+  type: LoadBalancer
+---
+#exposicion redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: basesdb-namespace
+spec:
+  selector:
+    app: redis-server
+  ports:
+    - port: 5301
+      targetPort: 6379
+  type: LoadBalancer
